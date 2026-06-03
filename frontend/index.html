@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sistema de cuestionarios en línea del IIMAS-UNAM. Responde formularios de manera sencilla y segura." />
+  <title>Cuestionarios IIMAS · UNAM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════
+       HEADER / NAV
+  ════════════════════════════════════════ -->
+  <header class="app-header" role="banner">
+    <div class="container header-inner">
+      <a href="#" class="brand" aria-label="Ir al inicio">
+        <img src="logo.png" alt="Logo UNAM IIMAS – 50 Aniversario" class="brand-logo" />
+      </a>
+      <nav class="header-nav" aria-label="Navegación principal">
+        <span class="nav-tag">Sistema de Cuestionarios</span>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════
+       MAIN APP SHELL
+  ════════════════════════════════════════ -->
+  <main id="app-root" class="app-root" role="main">
+
+    <!-- ── VISTA 1: Identificación de usuario ── -->
+    <section
+      id="view-login"
+      class="view view--active"
+      aria-labelledby="login-heading"
+    >
+      <div class="view-inner container--narrow">
+        <div class="view-header">
+          <div class="step-badge">Paso 1 de 2</div>
+          <h1 id="login-heading" class="view-title">Identificación</h1>
+          <p class="view-subtitle">
+            Ingresa tu nombre y correo para acceder al cuestionario.
+          </p>
+        </div>
+
+        <form id="form-login" class="card" novalidate aria-label="Formulario de identificación">
+          <div class="field-group">
+            <label class="field-label" for="input-nombre">Nombre completo</label>
+            <input
+              id="input-nombre"
+              name="nombre"
+              type="text"
+              class="field-input"
+              placeholder="Ej. María García López"
+              autocomplete="name"
+              required
+              aria-required="true"
+            />
+            <span class="field-error" id="error-nombre" role="alert" aria-live="polite"></span>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="input-correo">Correo electrónico</label>
+            <input
+              id="input-correo"
+              name="correo"
+              type="email"
+              class="field-input"
+              placeholder="Ej. mgarcia@ciencias.unam.mx"
+              autocomplete="email"
+              required
+              aria-required="true"
+            />
+            <span class="field-error" id="error-correo" role="alert" aria-live="polite"></span>
+          </div>
+
+          <div id="login-error-global" class="alert alert--error hidden" role="alert" aria-live="assertive"></div>
+
+          <button id="btn-login" type="submit" class="btn btn--primary btn--full">
+            <span class="btn-text">Continuar</span>
+            <span class="btn-spinner hidden" aria-hidden="true"></span>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ── VISTA 2: Cuestionario ── -->
+    <section
+      id="view-cuestionario"
+      class="view"
+      aria-labelledby="cuestionario-heading"
+    >
+      <div class="view-inner container--wide">
+        <!-- Cabecera del formulario -->
+        <div class="cuestionario-header">
+          <div class="step-badge">Paso 2 de 2</div>
+          <h1 id="titulo-formulario" class="view-title" aria-labelledby="cuestionario-heading">Cargando…</h1>
+          <p class="view-subtitle" id="descripcion-formulario"></p>
+        </div>
+
+        <!-- Progreso -->
+        <div class="progress-bar-wrap" aria-hidden="true">
+          <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+        </div>
+        <div class="progress-label" id="progress-label" aria-live="polite"></div>
+
+        <!-- Contenedor de preguntas -->
+        <form id="form-cuestionario" novalidate aria-label="Cuestionario">
+          <div id="preguntas-container" class="preguntas-container">
+            <!-- Las preguntas se inyectan dinámicamente -->
+          </div>
+
+          <div id="cuestionario-error-global" class="alert alert--error hidden" role="alert" aria-live="assertive"></div>
+
+          <div class="form-actions">
+            <button id="btn-submit" type="submit" class="btn btn--primary">
+              <span class="btn-text">Enviar respuestas</span>
+              <span class="btn-spinner hidden" aria-hidden="true"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ── VISTA 3: Ya respondió ── -->
+    <section
+      id="view-ya-respondio"
+      class="view"
+      aria-labelledby="ya-respondio-heading"
+    >
+      <div class="view-inner container--narrow">
+        <div class="state-card state-card--info">
+          <div class="state-icon" aria-hidden="true">📋</div>
+          <h1 id="ya-respondio-heading" class="state-title">Ya respondiste este cuestionario</h1>
+          <p class="state-body">
+            Tus respuestas han sido registradas previamente. A continuación
+            puedes consultar lo que enviaste.
+          </p>
+          <div id="respuestas-previas-container" class="respuestas-previas"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── VISTA 4: Éxito / Gracias ── -->
+    <section
+      id="view-gracias"
+      class="view"
+      aria-labelledby="gracias-heading"
+    >
+      <div class="view-inner container--narrow">
+        <div class="state-card state-card--success">
+          <div class="state-icon" aria-hidden="true">✅</div>
+          <h1 id="gracias-heading" class="state-title">¡Gracias por tu participación!</h1>
+          <p class="state-body">
+            Tus respuestas han sido enviadas correctamente. El equipo del
+            IIMAS-UNAM agradece tu tiempo.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── VISTA 5: Error general ── -->
+    <section
+      id="view-error"
+      class="view"
+      aria-labelledby="error-heading"
+    >
+      <div class="view-inner container--narrow">
+        <div class="state-card state-card--error">
+          <div class="state-icon" aria-hidden="true">⚠️</div>
+          <h1 id="error-heading" class="state-title">Algo salió mal</h1>
+          <p class="state-body" id="error-message">
+            No pudimos conectar con el servidor. Verifica que el backend esté
+            corriendo en <code>http://localhost:5000</code> e intenta de nuevo.
+          </p>
+          <button id="btn-reintentar" class="btn btn--secondary">
+            Reintentar
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════ -->
+  <footer class="app-footer" role="contentinfo">
+    <div class="container footer-inner">
+      <p class="footer-text">
+        © 2026 Instituto de Investigaciones en Matemáticas Aplicadas y en Sistemas ·
+        <a href="https://www.iimas.unam.mx" target="_blank" rel="noopener noreferrer">IIMAS-UNAM</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts: service layer primero, luego app -->
+  <script src="js/api.service.js"></script>
+  <script src="js/components/question.component.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

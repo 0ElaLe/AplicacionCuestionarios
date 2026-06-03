@@ -1,0 +1,810 @@
+/* ══════════════════════════════════════════════════════════════
+   CUESTIONARIOS IIMAS-UNAM  ·  main.css
+   Arquitectura: Design Tokens → Base → Layout → Components → Views
+══════════════════════════════════════════════════════════════ */
+
+/* ── 1. DESIGN TOKENS ─────────────────────────────────────── */
+:root {
+  /* Color palette */
+  --color-bg:           #ffffff;
+  --color-surface:      #f8f8fb;
+  --color-border:       #e4e4ec;
+  --color-border-focus: #3b47c9;
+
+  --color-text-primary:   #0f0f1a;
+  --color-text-secondary: #5a5a72;
+  --color-text-muted:     #9898b0;
+
+  --color-accent:         #3b47c9;   /* IIMAS blue / azul institucional */
+  --color-accent-hover:   #2f3aa8;
+  --color-accent-light:   #eef0fd;
+
+  --color-success:        #1a7a5a;
+  --color-success-light:  #edfaf3;
+  --color-error:          #c93b3b;
+  --color-error-light:    #fdeee e;
+  --color-info:           #1a5f8a;
+  --color-info-light:     #edf4fa;
+
+  /* Typography */
+  --font-family:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-size-xs:  0.75rem;   /* 12px */
+  --font-size-sm:  0.875rem;  /* 14px */
+  --font-size-md:  1rem;      /* 16px */
+  --font-size-lg:  1.125rem;  /* 18px */
+  --font-size-xl:  1.375rem;  /* 22px */
+  --font-size-2xl: 1.75rem;   /* 28px */
+  --font-size-3xl: 2.25rem;   /* 36px */
+
+  /* Spacing scale (multiples of 4px) */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* Border radius */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+
+  /* Layout */
+  --container-narrow: 560px;
+  --container-wide:   800px;
+  --header-height:    80px;
+}
+
+
+/* ── 2. RESET & BASE ───────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+img { max-width: 100%; height: auto; display: block; }
+
+ul, ol { list-style: none; }
+
+button { cursor: pointer; font-family: inherit; }
+
+code {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-size: 0.9em;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.4em;
+}
+
+
+/* ── 3. LAYOUT UTILITIES ──────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: var(--container-wide);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.container--narrow {
+  max-width: var(--container-narrow);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+  width: 100%;
+}
+
+.container--wide {
+  max-width: var(--container-wide);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+  width: 100%;
+}
+
+.hidden { display: none !important; }
+
+
+/* ── 4. HEADER ────────────────────────────────────────────── */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  height: 56px !important;
+  width: auto;
+  max-width: 340px;
+  object-fit: contain;
+  object-position: left center;
+  display: block;
+}
+
+.nav-tag {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-4);
+  letter-spacing: 0.01em;
+}
+
+
+/* ── 5. MAIN / VIEW SYSTEM ────────────────────────────────── */
+.app-root {
+  flex: 1;
+  padding: var(--space-16) 0 var(--space-24);
+}
+
+/* Views are hidden by default; JS adds .view--active */
+.view {
+  display: none;
+  animation: fadeSlideUp var(--transition-slow) both;
+}
+
+.view--active {
+  display: block;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.view-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.view-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  width: fit-content;
+}
+
+.view-title {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.view-subtitle {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  font-weight: 400;
+  line-height: 1.5;
+  max-width: 42ch;
+}
+
+
+/* ── 6. CARD ──────────────────────────────────────────────── */
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-10);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+
+/* ── 7. FORM FIELDS ───────────────────────────────────────── */
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: 0.01em;
+}
+
+.field-label .required-mark {
+  color: var(--color-error);
+  margin-left: var(--space-1);
+}
+
+.field-input,
+.field-textarea,
+.field-select {
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  width: 100%;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
+  appearance: none;
+}
+
+.field-input::placeholder,
+.field-textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.field-input:focus,
+.field-textarea:focus,
+.field-select:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 71, 201, 0.12);
+}
+
+.field-input.is-invalid,
+.field-textarea.is-invalid {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(201, 59, 59, 0.10);
+}
+
+.field-textarea {
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.6;
+}
+
+.field-error {
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+  font-weight: 500;
+  min-height: 1em;
+  display: block;
+}
+
+
+/* ── 8. CHOICE INPUTS (radio / checkbox) ─────────────────── */
+.choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.choice-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  user-select: none;
+}
+
+.choice-item:hover {
+  border-color: var(--color-border-focus);
+  background: var(--color-accent-light);
+}
+
+.choice-item input[type="radio"],
+.choice-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg);
+  flex-shrink: 0;
+  position: relative;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  cursor: pointer;
+}
+
+.choice-item input[type="checkbox"] {
+  border-radius: var(--radius-sm);
+}
+
+.choice-item input[type="radio"]:checked,
+.choice-item input[type="checkbox"]:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.choice-item input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.choice-item input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg);
+}
+
+.choice-item:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.choice-label {
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+
+/* ── 9. SCALE WIDGET ──────────────────────────────────────── */
+.scale-group {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.scale-btn {
+  flex: 1;
+  min-width: 44px;
+  aspect-ratio: 1;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+  cursor: pointer;
+}
+
+.scale-btn:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  transform: translateY(-2px);
+}
+
+.scale-btn.is-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 71, 201, 0.30);
+}
+
+.scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+}
+
+.scale-label-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+
+/* ── 10. PREGUNTA CARD ────────────────────────────────────── */
+.pregunta-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  transition: box-shadow var(--transition-fast);
+}
+
+.pregunta-card:focus-within {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-focus);
+}
+
+.pregunta-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.pregunta-numero {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.pregunta-texto {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.pregunta-obligatoria-badge {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+  font-weight: 600;
+  padding-top: 2px;
+}
+
+.pregunta-error {
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+  font-weight: 500;
+  display: none;
+}
+
+.pregunta-card.is-invalid .pregunta-error {
+  display: block;
+}
+
+.pregunta-card.is-invalid {
+  border-color: var(--color-error);
+}
+
+
+/* ── 11. PROGRESS BAR ─────────────────────────────────────── */
+.progress-bar-wrap {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent), #6c7bdf);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+}
+
+.progress-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  margin-top: var(--space-2);
+  text-align: right;
+}
+
+
+/* ── 12. BUTTONS ──────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-8);
+  border: none;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+  letter-spacing: 0.01em;
+  min-height: 52px;
+  position: relative;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn--primary {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(59, 71, 201, 0.30);
+}
+
+.btn--secondary {
+  background: var(--color-bg);
+  color: var(--color-accent);
+  border: 1.5px solid var(--color-accent);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--color-accent-light);
+  transform: translateY(-1px);
+}
+
+.btn--full { width: 100%; }
+
+/* Spinner */
+.btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+.btn--secondary .btn-spinner {
+  border-color: rgba(59, 71, 201, 0.25);
+  border-top-color: var(--color-accent);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+
+/* ── 13. ALERTS ───────────────────────────────────────────── */
+.alert {
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.alert--error {
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: var(--color-error);
+}
+
+.alert--success {
+  background: var(--color-success-light);
+  border: 1px solid #a7f3d0;
+  color: var(--color-success);
+}
+
+.alert--info {
+  background: var(--color-info-light);
+  border: 1px solid #bfdbfe;
+  color: var(--color-info);
+}
+
+
+/* ── 14. STATE CARDS (success / error / info screens) ────── */
+.state-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16) var(--space-10);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.state-icon {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.state-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.state-body {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  max-width: 40ch;
+  line-height: 1.6;
+}
+
+.state-card--success { border-top: 4px solid var(--color-success); }
+.state-card--error   { border-top: 4px solid var(--color-error); }
+.state-card--info    { border-top: 4px solid var(--color-accent); }
+
+
+/* ── 15. RESPUESTAS PREVIAS ───────────────────────────────── */
+.respuestas-previas {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.respuesta-previa-item {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+}
+
+.respuesta-previa-pregunta {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.respuesta-previa-valor {
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+
+/* ── 16. CUESTIONARIO HEADER ──────────────────────────────── */
+.cuestionario-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.preguntas-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+
+/* ── 17. FOOTER ───────────────────────────────────────────── */
+.app-footer {
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-6) 0;
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.footer-text a {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.footer-text a:hover { color: var(--color-accent); }
+
+
+/* ── 18. RESPONSIVE ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  :root {
+    --space-10: 1.75rem;
+    --space-16: 2.5rem;
+    --space-24: 3rem;
+  }
+
+  .view-title { font-size: var(--font-size-2xl); }
+
+  .card { padding: var(--space-6); }
+
+  .pregunta-card { padding: var(--space-6); }
+
+  .btn { padding: var(--space-3) var(--space-6); }
+
+  .scale-group { gap: var(--space-1); }
+
+  .brand-logo { height: 36px; }
+
+  .nav-tag { display: none; }
+}
