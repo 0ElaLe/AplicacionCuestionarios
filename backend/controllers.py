@@ -5,7 +5,8 @@ from modelo import (
     obtener_formulario,
     usuario_respondio_formulario,
     guardar_respuestas,
-    obtener_respuestas_usuario
+    obtener_respuestas_usuario,
+    eliminar_intento_usuario
 )
 
 
@@ -126,3 +127,25 @@ def obtener_respuestas_usuario_controller(id_usuario, id_formulario):
         "id_formulario": id_formulario,
         "respuestas": respuestas
     }, 200
+
+
+def reiniciar_formulario_controller(id_usuario, id_formulario):
+    try:
+        eliminado = eliminar_intento_usuario(id_usuario, id_formulario)
+
+        if not eliminado:
+            return {
+                "error": "No se encontró un intento previo para este usuario y formulario"
+            }, 404
+
+        return {
+            "mensaje": "Intento eliminado correctamente. El usuario puede volver a responder.",
+            "id_usuario": id_usuario,
+            "id_formulario": id_formulario
+        }, 200
+
+    except Exception as error:
+        return {
+            "error": "Ocurrió un error al reiniciar el formulario",
+            "detalle": str(error)
+        }, 500

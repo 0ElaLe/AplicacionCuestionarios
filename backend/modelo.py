@@ -185,6 +185,18 @@ def crear_o_obtener_usuario(nombre, correo):
     usuario = cursor.fetchone()
 
     if usuario:
+        # Si el nombre cambió, lo actualizamos
+        if usuario["nombre"] != nombre:
+            cursor.execute("""
+                UPDATE usuarios SET nombre = ? WHERE correo = ?
+            """, (nombre, correo))
+            conn.commit()
+
+        cursor.execute("""
+            SELECT id_usuario, nombre, correo, fecha_creacion
+            FROM usuarios WHERE correo = ?
+        """, (correo,))
+        usuario = cursor.fetchone()
         conn.close()
         return row_to_dict(usuario)
 
@@ -289,6 +301,58 @@ def usuario_respondio_formulario(id_usuario, id_formulario):
     conn.close()
 
     return intento is not None
+
+
+def eliminar_intento_usuario(id_usuario, id_formulario):
+    """Elimina el intento previo y todas sus respuestas para permitir reintentar."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("BEGIN")
+
+        # Obtener el id del intento
+        cursor.execute("""
+            SELECT id_intento FROM intentos_formulario
+            WHERE id_usuario = ? AND id_formulario = ?
+        """, (id_usuario, id_formulario))
+
+        intento = cursor.fetchone()
+        if intento is None:
+            conn.rollback()
+            conn.close()
+            return False
+
+        id_intento = intento["id_intento"]
+
+        # Eliminar opciones seleccionadas
+        cursor.execute("""
+            DELETE FROM respuestas_opciones
+            WHERE id_respuesta IN (
+                SELECT id_respuesta FROM respuestas WHERE id_intento = ?
+            )
+        """, (id_intento,))
+
+        # Eliminar respuestas
+        cursor.execute("""
+            DELETE FROM respuestas WHERE id_intento = ?
+        """, (id_intento,))
+
+        # Eliminar el intento
+        cursor.execute("""
+            DELETE FROM intentos_formulario WHERE id_intento = ?
+        """, (id_intento,))
+
+        conn.commit()
+        return True
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
 
 
 def obtener_tipo_pregunta(cursor, id_pregunta, id_formulario):

@@ -5,7 +5,8 @@ from controllers import (
     obtener_formulario_controller,
     verificar_usuario_respondio_controller,
     guardar_respuestas_controller,
-    obtener_respuestas_usuario_controller
+    obtener_respuestas_usuario_controller,
+    reiniciar_formulario_controller
 )
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -63,6 +64,19 @@ def guardar_respuestas():
 )
 def obtener_respuestas_usuario(id_usuario, id_formulario):
     respuesta, status = obtener_respuestas_usuario_controller(
+        id_usuario,
+        id_formulario
+    )
+
+    return jsonify(respuesta), status
+
+
+@api.route(
+    "/usuarios/<int:id_usuario>/respuestas/<int:id_formulario>",
+    methods=["DELETE"]
+)
+def reiniciar_formulario(id_usuario, id_formulario):
+    respuesta, status = reiniciar_formulario_controller(
         id_usuario,
         id_formulario
     )
