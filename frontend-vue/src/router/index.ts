@@ -1,20 +1,46 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import LoginView       from '../views/LoginView.vue'
-import CuestionarioView from '../views/CuestionarioView.vue'
-import YaRespondioView  from '../views/YaRespondioView.vue'
-import GraciasView      from '../views/GraciasView.vue'
-import ErrorView        from '../views/ErrorView.vue'
+
+const TOKEN_KEY = 'iq_token'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/',            component: LoginView,        name: 'login' },
-    { path: '/cuestionario', component: CuestionarioView, name: 'cuestionario' },
-    { path: '/ya-respondio', component: YaRespondioView,  name: 'ya-respondio' },
-    { path: '/gracias',      component: GraciasView,      name: 'gracias' },
-    { path: '/error',        component: ErrorView,        name: 'error' },
-    { path: '/:pathMatch(.*)*', redirect: '/' },
+    // ── Auth ─────────────────────────────────────────────────
+    { path: '/',          name: 'login',    component: () => import('../views/LoginView.vue') },
+    { path: '/registro',  name: 'registro', component: () => import('../views/RegisterView.vue') },
+
+    // ── Dashboard y flujo principal ───────────────────────────
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('../views/DashboardView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/crear',
+      name: 'crear',
+      component: () => import('../views/CrearCuestionarioView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/contestar/:codigo',
+      name: 'contestar',
+      component: () => import('../views/ContestarView.vue'),
+    },
+
+    // ── Flujo de respuesta ────────────────────────────────────
+    { path: '/cuestionario', name: 'cuestionario', component: () => import('../views/CuestionarioView.vue') },
+    { path: '/ya-respondio', name: 'ya-respondio', component: () => import('../views/YaRespondioView.vue') },
+    { path: '/gracias',      name: 'gracias',      component: () => import('../views/GraciasView.vue') },
+    { path: '/error',        name: 'error',        component: () => import('../views/ErrorView.vue') },
   ],
+})
+
+// Guard de autenticación
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth && !localStorage.getItem(TOKEN_KEY)) {
+    return { name: 'login' }
+  }
 })
 
 export default router

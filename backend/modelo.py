@@ -1,6 +1,10 @@
 import sqlite3
+import uuid
+import hashlib
+import json
 
 DB_NAME = "database.db"
+
 
 
 def get_connection():
@@ -389,13 +393,20 @@ def guardar_respuestas(id_usuario, id_formulario, respuestas):
     try:
         cursor.execute("BEGIN")
 
+        # UPSERT: si ya existe un intento en_progreso lo sobreescribe con 'enviado'
         cursor.execute("""
-            INSERT INTO intentos_formulario
-            (id_usuario, id_formulario, estado)
+            INSERT INTO intentos_formulario (id_usuario, id_formulario, estado)
             VALUES (?, ?, 'enviado')
+            ON CONFLICT(id_usuario, id_formulario)
+            DO UPDATE SET estado = 'enviado'
         """, (id_usuario, id_formulario))
 
-        id_intento = cursor.lastrowid
+        # Obtener el id_intento (recién insertado o el que ya existía)
+        cursor.execute(
+            "SELECT id_intento FROM intentos_formulario WHERE id_usuario = ? AND id_formulario = ?",
+            (id_usuario, id_formulario)
+        )
+        id_intento = cursor.fetchone()["id_intento"]
 
         for respuesta in respuestas:
             id_pregunta = respuesta.get("id_pregunta")
@@ -504,6 +515,16 @@ def guardar_respuestas(id_usuario, id_formulario, respuestas):
 
         conn.commit()
 
+        # Limpiar avance temporal ahora que ya está guardado definitivamente
+        try:
+            cursor.execute(
+                "DELETE FROM avance_respuestas WHERE id_usuario = ? AND id_formulario = ?",
+                (id_usuario, id_formulario)
+            )
+            conn.commit()
+        except Exception:
+            pass  # No crítico si falla
+
         return {
             "id_intento": id_intento
         }
@@ -585,3 +606,296 @@ def obtener_respuestas_usuario(id_usuario, id_formulario):
     conn.close()
 
     return resultado
+
+
+# ═══════════════════════════════════════════════════════════════
+#  V2 — AUTENTICACION
+# ═══════════════════════════════════════════════════════════════
+
+def _hash_password(password: str) -> str:
+    """Hashea la contraseña con SHA-256 + salt fijo. Simple y sin dependencias."""
+    salt = "iimas-unam-2026"
+    return hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+
+
+def registrar_usuario(nombre: str, correo: str, password: str):
+    """Crea un nuevo usuario con contraseña hasheada. Error si el correo ya existe."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id_usuario FROM usuarios WHERE correo = ?", (correo,))
+    if cursor.fetchone():
+        conn.close()
+        raise ValueError("El correo ya esta registrado")
+
+    ph = _hash_password(password)
+    cursor.execute(
+        "INSERT INTO usuarios (nombre, correo, password_hash, rol) VALUES (?, ?, ?, 'respondente')",
+        (nombre, correo, ph)
+    )
+    conn.commit()
+    uid = cursor.lastrowid
+    cursor.execute(
+        "SELECT id_usuario, nombre, correo, rol, fecha_creacion FROM usuarios WHERE id_usuario = ?",
+        (uid,)
+    )
+    user = row_to_dict(cursor.fetchone())
+    conn.close()
+    return user
+
+
+def login_usuario(correo: str, password: str):
+    """Valida credenciales. Retorna el usuario o None si son incorrectas."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id_usuario, nombre, correo, rol, password_hash, fecha_creacion FROM usuarios WHERE correo = ?",
+        (correo,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None:
+        return None
+
+    ph = _hash_password(password)
+    if row["password_hash"] != ph:
+        return None
+
+    d = dict(row)
+    d.pop("password_hash", None)
+    return d
+
+
+# ═══════════════════════════════════════════════════════════════
+#  V2 — FORMULARIOS DINAMICOS
+# ═══════════════════════════════════════════════════════════════
+
+def crear_formulario_v2(id_creador: int, titulo: str, descripcion: str, preguntas_data: list, visibilidad: str = "publico"):
+    """
+    Crea un formulario completo con sus preguntas y opciones.
+    preguntas_data: lista de {tipo, texto, obligatoria, opciones: [{texto, valor}]}
+    Retorna el formulario creado con su codigo_compartir.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("BEGIN")
+        codigo = uuid.uuid4().hex[:10].upper()
+
+        cursor.execute(
+            "INSERT INTO formularios (titulo, descripcion, estado, id_creador, codigo_compartir, visibilidad) VALUES (?, ?, 'publicado', ?, ?, ?)",
+            (titulo, descripcion, id_creador, codigo, visibilidad)
+        )
+        id_formulario = cursor.lastrowid
+
+
+        for orden, p in enumerate(preguntas_data, start=1):
+            cursor.execute(
+                "SELECT id_tipo_pregunta FROM tipos_pregunta WHERE nombre = ?",
+                (p["tipo"],)
+            )
+            tipo_row = cursor.fetchone()
+            if not tipo_row:
+                raise ValueError(f"Tipo de pregunta desconocido: {p['tipo']}")
+
+            cursor.execute(
+                "INSERT INTO preguntas (id_formulario, id_tipo_pregunta, texto, orden, obligatoria) VALUES (?, ?, ?, ?, ?)",
+                (id_formulario, tipo_row["id_tipo_pregunta"], p["texto"], orden, 1 if p.get("obligatoria", True) else 0)
+            )
+            id_pregunta = cursor.lastrowid
+
+            for i, opt in enumerate(p.get("opciones", []), start=1):
+                cursor.execute(
+                    "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, ?, ?, ?)",
+                    (id_pregunta, opt["texto"], opt.get("valor", opt["texto"].lower().replace(" ", "_")), i)
+                )
+
+        conn.commit()
+        conn.close()
+        return {"id_formulario": id_formulario, "codigo_compartir": codigo}
+
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+
+def obtener_formulario_por_codigo(codigo: str):
+    """Busca un formulario publicado por su codigo_compartir."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id_formulario FROM formularios WHERE codigo_compartir = ? AND estado = 'publicado'",
+        (codigo.upper(),)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return obtener_formulario(row["id_formulario"])
+
+
+def obtener_formularios_de_usuario(id_usuario: int):
+    """Lista todos los formularios creados por el usuario."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id_formulario, titulo, descripcion, estado, codigo_compartir, fecha_creacion FROM formularios WHERE id_creador = ? ORDER BY fecha_creacion DESC",
+        (id_usuario,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+# ═══════════════════════════════════════════════════════════════
+#  V2 — GUARDADO DE AVANCE
+# ═══════════════════════════════════════════════════════════════
+
+def guardar_avance(id_usuario: int, id_formulario: int, respuestas_parciales: list):
+    """
+    Guarda o actualiza respuestas parciales (en_progreso).
+    No lanza error si el usuario ya envió definitivamente — solo ignora.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Verificar si ya está enviado
+    cursor.execute(
+        "SELECT estado FROM intentos_formulario WHERE id_usuario = ? AND id_formulario = ?",
+        (id_usuario, id_formulario)
+    )
+    intento = cursor.fetchone()
+    if intento and intento["estado"] == "enviado":
+        conn.close()
+        return False  # Ya enviado, no se puede modificar
+
+    # Crear intento en_progreso si no existe
+    if not intento:
+        cursor.execute(
+            "INSERT OR IGNORE INTO intentos_formulario (id_usuario, id_formulario, estado) VALUES (?, ?, 'en_progreso')",
+            (id_usuario, id_formulario)
+        )
+    else:
+        cursor.execute(
+            "UPDATE intentos_formulario SET estado = 'en_progreso' WHERE id_usuario = ? AND id_formulario = ?",
+            (id_usuario, id_formulario)
+        )
+
+    for r in respuestas_parciales:
+        id_pregunta = r.get("id_pregunta")
+        if not id_pregunta:
+            continue
+        opciones_json = json.dumps(r.get("opciones", [])) if r.get("opciones") is not None else None
+        cursor.execute(
+            """INSERT INTO avance_respuestas (id_usuario, id_formulario, id_pregunta, respuesta_texto, respuesta_numero, opciones_json)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id_usuario, id_formulario, id_pregunta)
+               DO UPDATE SET respuesta_texto=excluded.respuesta_texto,
+                             respuesta_numero=excluded.respuesta_numero,
+                             opciones_json=excluded.opciones_json,
+                             fecha_guardado=CURRENT_TIMESTAMP""",
+            (id_usuario, id_formulario, id_pregunta,
+             r.get("respuesta_texto"), r.get("respuesta_numero"), opciones_json)
+        )
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def obtener_avance(id_usuario: int, id_formulario: int):
+    """Recupera el avance guardado de un usuario en un formulario."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT estado FROM intentos_formulario WHERE id_usuario = ? AND id_formulario = ?",
+        (id_usuario, id_formulario)
+    )
+    intento = cursor.fetchone()
+    estado = intento["estado"] if intento else None
+
+    cursor.execute(
+        "SELECT id_pregunta, respuesta_texto, respuesta_numero, opciones_json FROM avance_respuestas WHERE id_usuario = ? AND id_formulario = ?",
+        (id_usuario, id_formulario)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    respuestas = []
+    for r in rows:
+        d = dict(r)
+        if d["opciones_json"]:
+            d["opciones"] = json.loads(d["opciones_json"])
+        else:
+            d["opciones"] = []
+        del d["opciones_json"]
+        respuestas.append(d)
+
+    return {"estado": estado, "respuestas": respuestas}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  V2 — EXPLORACION DE FORMULARIOS
+# ═══════════════════════════════════════════════════════════════
+
+def obtener_formularios_publicos():
+    """Todos los formularios publicados con conteo de preguntas y respondentes."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            f.id_formulario,
+            f.titulo,
+            f.descripcion,
+            f.codigo_compartir,
+            f.fecha_creacion,
+            f.visibilidad,
+            u.nombre AS creado_por,
+            COUNT(DISTINCT p.id_pregunta)  AS total_preguntas,
+            COUNT(DISTINCT i.id_intento)   AS total_respuestas
+        FROM formularios f
+        LEFT JOIN usuarios   u ON f.id_creador    = u.id_usuario
+        LEFT JOIN preguntas  p ON p.id_formulario = f.id_formulario
+        LEFT JOIN intentos_formulario i
+               ON i.id_formulario = f.id_formulario AND i.estado = 'enviado'
+        WHERE f.estado = 'publicado' AND f.visibilidad = 'publico'
+        GROUP BY f.id_formulario
+        ORDER BY f.fecha_creacion DESC
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+
+
+def obtener_formularios_respondidos(id_usuario: int):
+    """Formularios que el usuario ya respondio (estado = enviado)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            f.id_formulario,
+            f.titulo,
+            f.descripcion,
+            f.codigo_compartir,
+            i.fecha_envio AS fecha_intento,
+            u.nombre AS creado_por,
+            COUNT(DISTINCT p.id_pregunta) AS total_preguntas,
+            COUNT(DISTINCT r.id_respuesta) AS preguntas_respondidas
+        FROM intentos_formulario i
+        INNER JOIN formularios f ON i.id_formulario = f.id_formulario
+        LEFT JOIN  usuarios    u ON f.id_creador     = u.id_usuario
+        LEFT JOIN  preguntas   p ON p.id_formulario  = f.id_formulario
+        LEFT JOIN  respuestas  r ON r.id_intento     = i.id_intento
+        WHERE i.id_usuario = ? AND i.estado = 'enviado'
+        GROUP BY f.id_formulario
+        ORDER BY i.fecha_envio DESC
+    """, (id_usuario,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [row_to_dict(r) for r in rows]
+

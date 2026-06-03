@@ -2,11 +2,11 @@
  * api.service.ts
  * ══════════════════════════════════════════════════════════════
  * Capa de acceso a datos — completamente desacoplada de la UI.
- * Todos los métodos retornan Promises tipadas.
  * ══════════════════════════════════════════════════════════════
  */
 
 const BASE_URL = 'http://localhost:5000'
+const TOKEN_KEY = 'iq_token'
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -14,6 +14,7 @@ export interface Usuario {
   id_usuario: number
   nombre: string
   correo: string
+  rol: string
   fecha_creacion: string
 }
 
@@ -29,7 +30,7 @@ export interface Pregunta {
   texto: string
   tipo: 'texto_corto' | 'texto_largo' | 'opcion_unica' | 'opcion_multiple' | 'escala'
   orden: number
-  obligatoria: number  // 1 = true, 0 = false
+  obligatoria: number
   opciones: OpcionRespuesta[]
 }
 
@@ -38,9 +39,42 @@ export interface Formulario {
   titulo: string
   descripcion: string
   estado: string
+  codigo_compartir?: string
   fecha_creacion: string
   preguntas: Pregunta[]
 }
+
+export interface FormularioResumen {
+  id_formulario: number
+  titulo: string
+  descripcion: string
+  estado: string
+  codigo_compartir: string
+  fecha_creacion: string
+}
+
+export interface FormularioPublico {
+  id_formulario: number
+  titulo: string
+  descripcion: string
+  codigo_compartir: string
+  fecha_creacion: string
+  creado_por: string | null
+  total_preguntas: number
+  total_respuestas: number
+}
+
+export interface FormularioRespondido {
+  id_formulario: number
+  titulo: string
+  descripcion: string
+  codigo_compartir: string
+  fecha_intento: string
+  creado_por: string | null
+  total_preguntas: number
+  preguntas_respondidas: number
+}
+
 
 export interface RespuestaEnvio {
   id_pregunta: number
@@ -60,80 +94,129 @@ export interface RespuestaPrevia {
   opciones_seleccionadas: { id_opcion: number; texto: string; valor: string }[]
 }
 
+export interface PreguntaNueva {
+  tipo: string
+  texto: string
+  obligatoria: boolean
+  opciones: { texto: string; valor?: string }[]
+}
+
+export interface AvanceRespuesta {
+  id_pregunta: number
+  respuesta_texto?: string | null
+  respuesta_numero?: number | null
+  opciones?: number[]
+}
+
 // ── Helper HTTP ─────────────────────────────────────────────
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown
-): Promise<T> {
-  const options: RequestInit = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  }
-  if (body !== undefined) options.body = JSON.stringify(body)
+function getHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  return headers
+}
 
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const options: RequestInit = { method, headers: getHeaders() }
+  if (body !== undefined) options.body = JSON.stringify(body)
   const res = await fetch(`${BASE_URL}${path}`, options)
   const data = await res.json().catch(() => ({}))
-
-  if (!res.ok) {
-    throw new Error(data.error ?? data.mensaje ?? `Error ${res.status}`)
-  }
+  if (!res.ok) throw new Error(data.error ?? data.mensaje ?? `Error ${res.status}`)
   return data as T
 }
 
 // ── Endpoints ───────────────────────────────────────────────
 
 export const apiService = {
-  /** Verifica que el backend esté disponible */
+
+  // ── Health ──────────────────────────────────────────────────
   checkHealth() {
     return request<{ status: string; mensaje: string }>('GET', '/api/health')
   },
 
-  /** Crea o recupera un usuario por correo */
+  // ── Auth v2 ─────────────────────────────────────────────────
+  registro(nombre: string, correo: string, password: string) {
+    return request<{ token: string; usuario: Usuario }>(
+      'POST', '/api/auth/registro', { nombre, correo, password }
+    )
+  },
+
+  login(correo: string, password: string) {
+    return request<{ token: string; usuario: Usuario }>(
+      'POST', '/api/auth/login', { correo, password }
+    )
+  },
+
+  meProfile() {
+    return request<{ usuario: Usuario }>('GET', '/api/auth/me')
+  },
+
+  // ── Formularios v2 ───────────────────────────────────────────
+  crearFormulario(titulo: string, descripcion: string, visibilidad: string, preguntas: PreguntaNueva[]) {
+    return request<{ id_formulario: number; codigo_compartir: string }>(
+      'POST', '/api/v2/formularios', { titulo, descripcion, visibilidad, preguntas }
+    )
+  },
+
+  obtenerFormularioPorCodigo(codigo: string) {
+    return request<{ formulario: Formulario }>('GET', `/api/v2/formularios/codigo/${codigo}`)
+  },
+
+  misFormularios() {
+    return request<{ formularios: FormularioResumen[] }>('GET', '/api/v2/formularios/mios')
+  },
+
+  formulariosPublicos() {
+    return request<{ formularios: FormularioPublico[] }>('GET', '/api/v2/formularios/publicos')
+  },
+
+  formulariosRespondidos(idUsuario: number) {
+    return request<{ formularios: FormularioRespondido[] }>('GET', `/api/v2/formularios/respondidos/${idUsuario}`)
+  },
+
+
+  // ── Avance v2 ────────────────────────────────────────────────
+  guardarAvance(idUsuario: number, idFormulario: number, respuestas: AvanceRespuesta[]) {
+    return request<{ mensaje: string; ya_enviado: boolean }>(
+      'POST', '/api/v2/avance',
+      { id_usuario: idUsuario, id_formulario: idFormulario, respuestas }
+    )
+  },
+
+  obtenerAvance(idUsuario: number, idFormulario: number) {
+    return request<{ estado: string | null; respuestas: AvanceRespuesta[] }>(
+      'GET', `/api/v2/avance/${idUsuario}/${idFormulario}`
+    )
+  },
+
+  // ── Legacy (flujo original) ───────────────────────────────────
   crearORecuperarUsuario(nombre: string, correo: string) {
     return request<{ mensaje: string; usuario: Usuario }>(
       'POST', '/api/usuarios', { nombre, correo }
     )
   },
 
-  /** Obtiene la estructura completa de un formulario */
   obtenerFormulario(idFormulario: number) {
-    return request<{ formulario: Formulario }>(
-      'GET', `/api/formularios/${idFormulario}`
-    )
+    return request<{ formulario: Formulario }>('GET', `/api/formularios/${idFormulario}`)
   },
 
-  /** Verifica si el usuario ya respondió el formulario */
   verificarUsuarioRespondio(idUsuario: number, idFormulario: number) {
     return request<{ id_usuario: number; id_formulario: number; respondio: boolean }>(
       'GET', `/api/usuarios/${idUsuario}/respondio/${idFormulario}`
     )
   },
 
-  /** Guarda las respuestas del usuario */
-  guardarRespuestas(
-    idUsuario: number,
-    idFormulario: number,
-    respuestas: RespuestaEnvio[]
-  ) {
+  guardarRespuestas(idUsuario: number, idFormulario: number, respuestas: RespuestaEnvio[]) {
     return request<{ mensaje: string; id_intento: number }>(
       'POST', '/api/respuestas',
       { id_usuario: idUsuario, id_formulario: idFormulario, respuestas }
     )
   },
 
-  /** Obtiene las respuestas previas de un usuario */
   obtenerRespuestasUsuario(idUsuario: number, idFormulario: number) {
     return request<{ id_usuario: number; id_formulario: number; respuestas: RespuestaPrevia[] }>(
       'GET', `/api/usuarios/${idUsuario}/respuestas/${idFormulario}`
-    )
-  },
-
-  /** Elimina el intento previo para que el usuario pueda volver a responder */
-  reiniciarRespuestas(idUsuario: number, idFormulario: number) {
-    return request<{ mensaje: string; id_usuario: number; id_formulario: number }>(
-      'DELETE', `/api/usuarios/${idUsuario}/respuestas/${idFormulario}`
     )
   },
 }
