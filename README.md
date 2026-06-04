@@ -62,7 +62,6 @@ python -m venv .venv
 # Windows
 .venv\Scripts\activate
 
-```bash
 pip install -r requirements.txt
 ```
 
