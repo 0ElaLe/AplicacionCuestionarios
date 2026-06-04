@@ -52,41 +52,51 @@ cd AplicacionCuestionarios
 ### 2. Configurar el backend
 
 ```bash
-# Crear entorno virtual
+cd backend
 python -m venv .venv
-
-# Activar el entorno virtual
-# Windows PowerShell:
-.venv\Scripts\activate
-# macOS / Linux:
-source .venv/bin/activate
-
-# Instalar dependencias
-pip install -r backend/requirements.txt
-
-# Ejecutar migración de base de datos (solo la primera vez)
-python backend/migrate_v2.py
 ```
 
-### 3. Iniciar el backend
+**Activar el entorno virtual:**
 
 ```bash
-python backend/app.py
+# Windows
+.venv\Scripts\activate
+
+```bash
+pip install -r requirements.txt
 ```
 
-La API queda disponible en `http://localhost:5000`
+### 3. Inicializar la base de datos
 
-### 4. Configurar e iniciar el frontend
+```bash
+# Primero arranca Flask para crear las tablas, luego Ctrl+C para pararlo
+python app.py
 
-Abrir una segunda terminal:
+# Luego corre la migración
+python migrate_v2.py
+```
+
+### 4. Arrancar el backend
+
+```bash
+python app.py
+```
+
+La API quedará disponible en: `http://localhost:5000`
+
+---
+
+### 5. Configurar e iniciar el frontend
+
+Abre una segunda terminal desde la raíz del proyecto:
 
 ```bash
 cd frontend-vue
-npm install        # solo la primera vez
+npm install
 npm run dev
 ```
 
-La aplicación queda disponible en `http://localhost:5173`
+El frontend quedará disponible en: `http://localhost:5173`
 
 ---
 
