@@ -130,7 +130,9 @@ def insertar_datos_semilla(cursor):
     (2, 'texto_largo', 'Respuesta textual extensa'),
     (3, 'opcion_unica', 'Selección de una sola opción'),
     (4, 'opcion_multiple', 'Selección de varias opciones'),
-    (5, 'escala', 'Respuesta numérica dentro de una escala');
+    (5, 'escala', 'Respuesta numérica dentro de una escala'),
+    (6, 'si_no', 'Pregunta de Sí o No'),
+    (7, 'fecha', 'Respuesta de tipo fecha');
 
     INSERT OR IGNORE INTO formularios
     (id_formulario, titulo, descripcion, estado)
@@ -231,7 +233,7 @@ def obtener_formulario(id_formulario):
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id_formulario, titulo, descripcion, estado, fecha_creacion
+        SELECT id_formulario, titulo, descripcion, estado, visibilidad, codigo_compartir, id_creador, fecha_creacion
         FROM formularios
         WHERE id_formulario = ?
     """, (id_formulario,))
@@ -455,7 +457,7 @@ def guardar_respuestas(id_usuario, id_formulario, respuestas):
                             "La escala debe estar entre 1 y 5"
                         )
 
-            elif tipo in ["opcion_unica", "opcion_multiple"]:
+            elif tipo in ["opcion_unica", "opcion_multiple", "si_no"]:
                 opciones = respuesta.get("opciones", [])
 
                 if pregunta["obligatoria"] and len(opciones) == 0:
@@ -463,7 +465,7 @@ def guardar_respuestas(id_usuario, id_formulario, respuestas):
                         f"La pregunta {id_pregunta} es obligatoria"
                     )
 
-                if tipo == "opcion_unica" and len(opciones) > 1:
+                if tipo in ["opcion_unica", "si_no"] and len(opciones) > 1:
                     raise ValueError(
                         f"La pregunta {id_pregunta} solo permite una opción"
                     )
@@ -477,6 +479,13 @@ def guardar_respuestas(id_usuario, id_formulario, respuestas):
                         raise ValueError(
                             f"La opción {id_opcion} no pertenece a la pregunta {id_pregunta}"
                         )
+
+            elif tipo == "fecha":
+                respuesta_texto = respuesta.get("respuesta_texto")
+                if pregunta["obligatoria"] and not respuesta_texto:
+                    raise ValueError(
+                        f"La pregunta {id_pregunta} es obligatoria"
+                    )
 
             else:
                 raise ValueError(
@@ -503,7 +512,7 @@ def guardar_respuestas(id_usuario, id_formulario, respuestas):
 
             id_respuesta = cursor.lastrowid
 
-            if tipo in ["opcion_unica", "opcion_multiple"]:
+            if tipo in ["opcion_unica", "opcion_multiple", "si_no"]:
                 opciones = respuesta.get("opciones", [])
 
                 for id_opcion in opciones:
@@ -706,11 +715,21 @@ def crear_formulario_v2(id_creador: int, titulo: str, descripcion: str, pregunta
             )
             id_pregunta = cursor.lastrowid
 
-            for i, opt in enumerate(p.get("opciones", []), start=1):
+            if p["tipo"] == "si_no":
                 cursor.execute(
-                    "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, ?, ?, ?)",
-                    (id_pregunta, opt["texto"], opt.get("valor", opt["texto"].lower().replace(" ", "_")), i)
+                    "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, 'Sí', 'si', 1)",
+                    (id_pregunta,)
                 )
+                cursor.execute(
+                    "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, 'No', 'no', 2)",
+                    (id_pregunta,)
+                )
+            else:
+                for i, opt in enumerate(p.get("opciones", []), start=1):
+                    cursor.execute(
+                        "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, ?, ?, ?)",
+                        (id_pregunta, opt["texto"], opt.get("valor", opt["texto"].lower().replace(" ", "_")), i)
+                    )
 
         conn.commit()
         conn.close()
@@ -870,6 +889,245 @@ def obtener_formularios_publicos():
     rows = cursor.fetchall()
     conn.close()
     return [row_to_dict(r) for r in rows]
+
+
+def obtener_formulario_por_id(id_formulario: int, id_usuario: int):
+    """Devuelve el formulario completo solo si el usuario es su creador."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id_creador FROM formularios WHERE id_formulario = ?",
+        (id_formulario,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row is None or row["id_creador"] != id_usuario:
+        return None
+    return obtener_formulario(id_formulario)
+
+
+def _contar_respuestas(id_formulario: int, cursor) -> int:
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM intentos_formulario WHERE id_formulario = ? AND estado = 'enviado'",
+        (id_formulario,)
+    )
+    return cursor.fetchone()["total"]
+
+
+def editar_formulario_v2(id_formulario: int, id_usuario: int, titulo: str, descripcion: str, visibilidad: str, preguntas_data: list):
+    """
+    Actualiza un formulario. Siempre actualiza metadatos.
+    Actualiza las preguntas solo si no hay respuestas todavía.
+    Retorna {'preguntas_editadas': bool, 'tiene_respuestas': bool}.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id_creador FROM formularios WHERE id_formulario = ?",
+        (id_formulario,)
+    )
+    form = cursor.fetchone()
+    if form is None or form["id_creador"] != id_usuario:
+        conn.close()
+        raise PermissionError("No tienes permiso para editar este cuestionario")
+
+    total = _contar_respuestas(id_formulario, cursor)
+
+    try:
+        cursor.execute("BEGIN")
+
+        cursor.execute(
+            "UPDATE formularios SET titulo = ?, descripcion = ?, visibilidad = ? WHERE id_formulario = ?",
+            (titulo, descripcion, visibilidad, id_formulario)
+        )
+
+        preguntas_editadas = False
+        if total == 0 and preguntas_data:
+            cursor.execute(
+                "SELECT id_pregunta FROM preguntas WHERE id_formulario = ?",
+                (id_formulario,)
+            )
+            ids_preguntas = [r["id_pregunta"] for r in cursor.fetchall()]
+
+            if ids_preguntas:
+                placeholders = ",".join("?" * len(ids_preguntas))
+                cursor.execute(
+                    f"DELETE FROM opciones_respuesta WHERE id_pregunta IN ({placeholders})",
+                    ids_preguntas
+                )
+                cursor.execute(
+                    f"DELETE FROM preguntas WHERE id_pregunta IN ({placeholders})",
+                    ids_preguntas
+                )
+
+            for orden, p in enumerate(preguntas_data, start=1):
+                cursor.execute(
+                    "SELECT id_tipo_pregunta FROM tipos_pregunta WHERE nombre = ?",
+                    (p["tipo"],)
+                )
+                tipo_row = cursor.fetchone()
+                if not tipo_row:
+                    raise ValueError(f"Tipo de pregunta desconocido: {p['tipo']}")
+
+                cursor.execute(
+                    "INSERT INTO preguntas (id_formulario, id_tipo_pregunta, texto, orden, obligatoria) VALUES (?, ?, ?, ?, ?)",
+                    (id_formulario, tipo_row["id_tipo_pregunta"], p["texto"], orden,
+                     1 if p.get("obligatoria", True) else 0)
+                )
+                id_pregunta = cursor.lastrowid
+
+                if p["tipo"] == "si_no":
+                    cursor.execute(
+                        "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, 'Sí', 'si', 1)",
+                        (id_pregunta,)
+                    )
+                    cursor.execute(
+                        "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, 'No', 'no', 2)",
+                        (id_pregunta,)
+                    )
+                else:
+                    for i, opt in enumerate(p.get("opciones", []), start=1):
+                        cursor.execute(
+                            "INSERT INTO opciones_respuesta (id_pregunta, texto, valor, orden) VALUES (?, ?, ?, ?)",
+                            (id_pregunta, opt["texto"],
+                             opt.get("valor", opt["texto"].lower().replace(" ", "_")), i)
+                        )
+
+            preguntas_editadas = True
+
+        conn.commit()
+        return {"preguntas_editadas": preguntas_editadas, "tiene_respuestas": total > 0}
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+
+def archivar_formulario(id_formulario: int, id_usuario: int):
+    """Alterna el estado publicado/archivado de un formulario."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id_creador, estado FROM formularios WHERE id_formulario = ?",
+        (id_formulario,)
+    )
+    form = cursor.fetchone()
+    if form is None or form["id_creador"] != id_usuario:
+        conn.close()
+        raise PermissionError("No tienes permiso para archivar este cuestionario")
+
+    nuevo_estado = "archivado" if form["estado"] == "publicado" else "publicado"
+    cursor.execute(
+        "UPDATE formularios SET estado = ? WHERE id_formulario = ?",
+        (nuevo_estado, id_formulario)
+    )
+    conn.commit()
+    conn.close()
+    return {"estado": nuevo_estado}
+
+
+def obtener_resultados_formulario(id_formulario: int, id_usuario: int):
+    """
+    Devuelve las respuestas agregadas por pregunta para el creador del formulario.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id_formulario, titulo, descripcion, id_creador FROM formularios WHERE id_formulario = ?",
+        (id_formulario,)
+    )
+    form = cursor.fetchone()
+    if form is None or form["id_creador"] != id_usuario:
+        conn.close()
+        return None
+
+    total_respuestas = _contar_respuestas(id_formulario, cursor)
+
+    cursor.execute("""
+        SELECT p.id_pregunta, p.texto, p.orden, p.obligatoria, tp.nombre AS tipo
+        FROM preguntas p
+        INNER JOIN tipos_pregunta tp ON p.id_tipo_pregunta = tp.id_tipo_pregunta
+        WHERE p.id_formulario = ?
+        ORDER BY p.orden
+    """, (id_formulario,))
+    preguntas = cursor.fetchall()
+
+    resultado_preguntas = []
+    for pregunta in preguntas:
+        p = dict(pregunta)
+        tipo = p["tipo"]
+        id_pregunta = p["id_pregunta"]
+
+        if tipo in ["texto_corto", "texto_largo", "fecha"]:
+            cursor.execute("""
+                SELECT r.respuesta_texto
+                FROM respuestas r
+                INNER JOIN intentos_formulario i ON r.id_intento = i.id_intento
+                WHERE r.id_pregunta = ? AND i.id_formulario = ? AND i.estado = 'enviado'
+                  AND r.respuesta_texto IS NOT NULL AND r.respuesta_texto != ''
+            """, (id_pregunta, id_formulario))
+            p["respuestas_texto"] = [row["respuesta_texto"] for row in cursor.fetchall()]
+
+        elif tipo == "escala":
+            cursor.execute("""
+                SELECT r.respuesta_numero
+                FROM respuestas r
+                INNER JOIN intentos_formulario i ON r.id_intento = i.id_intento
+                WHERE r.id_pregunta = ? AND i.id_formulario = ? AND i.estado = 'enviado'
+                  AND r.respuesta_numero IS NOT NULL
+            """, (id_pregunta, id_formulario))
+            numeros = [row["respuesta_numero"] for row in cursor.fetchall()]
+            if numeros:
+                p["promedio"] = round(sum(numeros) / len(numeros), 1)
+                dist = {}
+                for n in numeros:
+                    key = str(int(n))
+                    dist[key] = dist.get(key, 0) + 1
+                p["distribucion"] = dist
+            else:
+                p["promedio"] = None
+                p["distribucion"] = {}
+            p["total"] = len(numeros)
+
+        elif tipo in ["opcion_unica", "opcion_multiple", "si_no"]:
+            cursor.execute("""
+                SELECT o.id_opcion, o.texto, COUNT(ro.id_opcion) AS conteo
+                FROM opciones_respuesta o
+                LEFT JOIN respuestas_opciones ro ON o.id_opcion = ro.id_opcion
+                LEFT JOIN respuestas r ON ro.id_respuesta = r.id_respuesta
+                LEFT JOIN intentos_formulario i
+                       ON r.id_intento = i.id_intento
+                      AND i.id_formulario = ? AND i.estado = 'enviado'
+                WHERE o.id_pregunta = ?
+                GROUP BY o.id_opcion
+                ORDER BY o.orden
+            """, (id_formulario, id_pregunta))
+            opciones = cursor.fetchall()
+            total_sel = sum(o["conteo"] for o in opciones)
+            p["opciones"] = [
+                {
+                    "id_opcion": o["id_opcion"],
+                    "texto": o["texto"],
+                    "conteo": o["conteo"],
+                    "porcentaje": round(o["conteo"] / total_sel * 100) if total_sel > 0 else 0
+                }
+                for o in opciones
+            ]
+
+        resultado_preguntas.append(p)
+
+    conn.close()
+    return {
+        "formulario": dict(form),
+        "total_respuestas": total_respuestas,
+        "preguntas": resultado_preguntas
+    }
 
 
 def obtener_formularios_respondidos(id_usuario: int):

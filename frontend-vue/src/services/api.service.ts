@@ -28,10 +28,32 @@ export interface OpcionRespuesta {
 export interface Pregunta {
   id_pregunta: number
   texto: string
-  tipo: 'texto_corto' | 'texto_largo' | 'opcion_unica' | 'opcion_multiple' | 'escala'
+  tipo: 'texto_corto' | 'texto_largo' | 'opcion_unica' | 'opcion_multiple' | 'escala' | 'si_no' | 'fecha'
   orden: number
   obligatoria: number
   opciones: OpcionRespuesta[]
+}
+
+export interface ResultadoPregunta {
+  id_pregunta: number
+  texto: string
+  tipo: string
+  orden: number
+  obligatoria: number
+  // texto/fecha
+  respuestas_texto?: string[]
+  // escala
+  promedio?: number | null
+  distribucion?: Record<string, number>
+  total?: number
+  // opciones
+  opciones?: { id_opcion: number; texto: string; conteo: number; porcentaje: number }[]
+}
+
+export interface ResultadosFormulario {
+  formulario: { id_formulario: number; titulo: string; descripcion: string }
+  total_respuestas: number
+  preguntas: ResultadoPregunta[]
 }
 
 export interface Formulario {
@@ -51,6 +73,7 @@ export interface FormularioResumen {
   estado: string
   codigo_compartir: string
   fecha_creacion: string
+  visibilidad?: string
 }
 
 export interface FormularioPublico {
@@ -188,6 +211,24 @@ export const apiService = {
     return request<{ estado: string | null; respuestas: AvanceRespuesta[] }>(
       'GET', `/api/v2/avance/${idUsuario}/${idFormulario}`
     )
+  },
+
+  obtenerFormularioPorId(idFormulario: number) {
+    return request<{ formulario: Formulario }>('GET', `/api/v2/formularios/${idFormulario}`)
+  },
+
+  editarFormulario(idFormulario: number, titulo: string, descripcion: string, visibilidad: string, preguntas: PreguntaNueva[]) {
+    return request<{ preguntas_editadas: boolean; tiene_respuestas: boolean }>(
+      'PUT', `/api/v2/formularios/${idFormulario}`, { titulo, descripcion, visibilidad, preguntas }
+    )
+  },
+
+  archivarFormulario(idFormulario: number) {
+    return request<{ estado: string }>('PATCH', `/api/v2/formularios/${idFormulario}/archivar`)
+  },
+
+  obtenerResultados(idFormulario: number) {
+    return request<ResultadosFormulario>('GET', `/api/v2/formularios/${idFormulario}/resultados`)
   },
 
   // ── Legacy (flujo original) ───────────────────────────────────

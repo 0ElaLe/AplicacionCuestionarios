@@ -1,82 +1,131 @@
-# Aplicación de Cuestionarios V2
+# Aplicación Web de Cuestionarios
 
-Una aplicación web desacoplada para la creación, distribución y resolución de cuestionarios dinámicos.
+Aplicación web desacoplada para crear, distribuir y analizar cuestionarios en línea.  
+Proyecto Final — Desarrollo de Aplicaciones Web Desacopladas · IIMAS UNAM · 2026
 
-## Arquitectura
+**Equipo:** Alejandro Iram Ramírez Nava · Erick José Fabián Sandoval · Abril Minerva Estrada Montaño
 
-*   **Frontend**: Vue 3 + TypeScript + Vite.
-*   **Backend**: Python + Flask.
-*   **Base de Datos**: SQLite3.
+---
 
-## Novedades en V2
+## Stack
 
-*   **Autenticación JWT**: Sistema de login y registro de usuarios.
-*   **Formularios Dinámicos**: Crea cuestionarios interactivos con 5 tipos de preguntas:
-    *   Texto corto
-    *   Texto largo
-    *   Opción única
-    *   Opción múltiple
-    *   Escala (1-5)
-*   **Gestión de Cuestionarios**: 
-    *   Mis cuestionarios (Creados por ti).
-    *   Cuestionarios Públicos (Explorar).
-    *   Historial (Cuestionarios respondidos).
-*   **Guardado Automático (Avance)**: El progreso de los usuarios se guarda automáticamente para evitar pérdida de datos si cierran la página antes de enviar el cuestionario.
-*   **Privacidad**: Opción de crear cuestionarios Públicos o Privados (solo accesibles con el código único).
+| Capa | Tecnología |
+|---|---|
+| Frontend | Vue 3 + TypeScript + Vite |
+| Backend | Python + Flask |
+| Base de datos | SQLite |
+| Auth | Token Bearer (SHA-256) |
 
-## Estructura del Proyecto
+---
 
-```
-/
-├── backend/
-│   ├── app.py                      # Punto de entrada principal Flask
-│   ├── modelo.py                   # Acceso a base de datos (SQLite)
-│   ├── v2_routes.py                # Endpoints de la API v2
-│   ├── schema.sql                  # Esquema inicial
-│   ├── migrate_v2.py               # Script de migración de base de datos a V2
-│   ├── seed_cuestionario_prueba.py # Script de poblamiento de prueba
-│   └── test_e2e.py                 # Script de pruebas end-to-end
-│
-└── frontend-vue/
-    ├── src/
-    │   ├── components/             # Componentes reusables de UI y preguntas
-    │   ├── composables/            # Lógica de estado compartida (useAuth, etc.)
-    │   ├── services/               # Llamadas a la API y configuración HTTP
-    │   ├── views/                  # Páginas principales (Dashboard, Crear, Contestar)
-    │   └── assets/                 # Estilos globales y tokens
-    └── package.json                # Dependencias Node.js
-```
+## Funcionalidades
 
-## Ejecución Local
+- Registro e inicio de sesión con contraseña
+- Crear cuestionarios con 7 tipos de pregunta: texto corto, texto largo, opción única, opción múltiple, escala 1–5, Sí/No y fecha
+- Reordenar preguntas con botones ↑ ↓
+- Editar cuestionarios (preguntas editables solo si no tienen respuestas aún)
+- Archivar / publicar cuestionarios
+- Compartir cuestionarios con código único de 10 caracteres
+- Cuestionarios públicos o privados
+- Guardado automático de avance al contestar
+- Ver resultados con estadísticas: promedio, distribución por barras y listado de respuestas textuales
 
-### 1. Iniciar el Backend (Terminal 1)
+---
+
+## Requisitos previos
+
+- Python 3.10 o superior
+- Node.js 18 o superior
+- Git
+
+---
+
+## Instalación y ejecución
+
+### 1. Clonar el repositorio
 
 ```bash
-cd backend
-
-# 1. Instalar dependencias
-pip install flask flask-cors pyjwt requests
-
-# 2. Inicializar la base de datos (Ejecutar solo la primera vez)
-python init_db.py
-
-# 3. Levantar el servidor
-python app.py
+git clone https://github.com/0ElaLe/AplicacionCuestionarios.git
+cd AplicacionCuestionarios
 ```
 
-### 2. Iniciar el Frontend (Terminal 2)
+### 2. Configurar el backend
+
+```bash
+# Crear entorno virtual
+python -m venv .venv
+
+# Activar el entorno virtual
+# Windows PowerShell:
+.venv\Scripts\activate
+# macOS / Linux:
+source .venv/bin/activate
+
+# Instalar dependencias
+pip install -r backend/requirements.txt
+
+# Ejecutar migración de base de datos (solo la primera vez)
+python backend/migrate_v2.py
+```
+
+### 3. Iniciar el backend
+
+```bash
+python backend/app.py
+```
+
+La API queda disponible en `http://localhost:5000`
+
+### 4. Configurar e iniciar el frontend
+
+Abrir una segunda terminal:
 
 ```bash
 cd frontend-vue
-npm install
+npm install        # solo la primera vez
 npm run dev
 ```
 
-La aplicación estará disponible en [http://localhost:5173](http://localhost:5173).
+La aplicación queda disponible en `http://localhost:5173`
 
-## Pruebas (E2E)
-Para verificar la integridad de la API de manera automática:
-```bash
-cd backend
-python test_e2e.py
+---
+
+## Estructura del proyecto
+
 ```
+├── backend/
+│   ├── app.py              # Entrada de Flask
+│   ├── modelo.py           # Acceso a datos y lógica de negocio
+│   ├── v2_routes.py        # Rutas v2 (formularios, auth, resultados)
+│   ├── auth_routes.py      # Registro e inicio de sesión
+│   ├── rutas.py            # Rutas legacy (flujo anónimo)
+│   ├── middleware.py       # Validación de token Bearer
+│   ├── migrate_v2.py       # Migración de base de datos
+│   └── requirements.txt
+│
+└── frontend-vue/
+    └── src/
+        ├── views/          # Vistas (Dashboard, Crear, Editar, Contestar, Resultados...)
+        ├── components/
+        │   └── questions/  # Componentes por tipo de pregunta
+        ├── services/       # api.service.ts — comunicación con la API
+        ├── composables/    # useAuth, useApp
+        └── router/         # Rutas con guards de autenticación
+```
+
+---
+
+## Endpoints principales
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/api/auth/registro` | Registrar usuario |
+| POST | `/api/auth/login` | Iniciar sesión |
+| POST | `/api/v2/formularios` | Crear cuestionario |
+| GET | `/api/v2/formularios/mios` | Mis cuestionarios |
+| GET | `/api/v2/formularios/codigo/:codigo` | Obtener cuestionario por código |
+| PUT | `/api/v2/formularios/:id` | Editar cuestionario |
+| PATCH | `/api/v2/formularios/:id/archivar` | Archivar / publicar |
+| GET | `/api/v2/formularios/:id/resultados` | Ver resultados y estadísticas |
+| POST | `/api/respuestas` | Guardar respuestas |
+| POST | `/api/v2/avance` | Guardar avance parcial |

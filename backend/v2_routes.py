@@ -6,11 +6,15 @@ from middleware import requiere_token
 from modelo import (
     crear_formulario_v2,
     obtener_formulario_por_codigo,
+    obtener_formulario_por_id,
     obtener_formularios_de_usuario,
     obtener_formularios_publicos,
     obtener_formularios_respondidos,
     guardar_avance,
     obtener_avance,
+    editar_formulario_v2,
+    archivar_formulario,
+    obtener_resultados_formulario,
 )
 
 v2_bp = Blueprint("v2", __name__, url_prefix="/api/v2")
@@ -48,6 +52,63 @@ def crear_formulario():
         return jsonify({"error": str(e)}), 400
 
     return jsonify(resultado), 201
+
+
+@v2_bp.route("/formularios/<int:id_formulario>", methods=["GET"])
+@requiere_token
+def get_formulario_por_id(id_formulario):
+    formulario = obtener_formulario_por_id(id_formulario, g.usuario_actual["id_usuario"])
+    if formulario is None:
+        return jsonify({"error": "Formulario no encontrado o sin permiso"}), 404
+    return jsonify({"formulario": formulario}), 200
+
+
+@v2_bp.route("/formularios/<int:id_formulario>", methods=["PUT"])
+@requiere_token
+def editar_formulario(id_formulario):
+    data = request.get_json() or {}
+    titulo      = (data.get("titulo") or "").strip()
+    descripcion = (data.get("descripcion") or "").strip()
+    visibilidad = (data.get("visibilidad") or "publico").strip()
+    preguntas   = data.get("preguntas", [])
+
+    if not titulo:
+        return jsonify({"error": "El titulo es obligatorio"}), 400
+
+    try:
+        resultado = editar_formulario_v2(
+            id_formulario=id_formulario,
+            id_usuario=g.usuario_actual["id_usuario"],
+            titulo=titulo,
+            descripcion=descripcion,
+            visibilidad=visibilidad,
+            preguntas_data=preguntas,
+        )
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify(resultado), 200
+
+
+@v2_bp.route("/formularios/<int:id_formulario>/archivar", methods=["PATCH"])
+@requiere_token
+def toggle_archivar(id_formulario):
+    try:
+        resultado = archivar_formulario(id_formulario, g.usuario_actual["id_usuario"])
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    return jsonify(resultado), 200
+
+
+@v2_bp.route("/formularios/<int:id_formulario>/resultados", methods=["GET"])
+@requiere_token
+def get_resultados(id_formulario):
+    datos = obtener_resultados_formulario(id_formulario, g.usuario_actual["id_usuario"])
+    if datos is None:
+        return jsonify({"error": "Formulario no encontrado o sin permiso"}), 404
+    return jsonify(datos), 200
 
 
 @v2_bp.route("/formularios/codigo/<string:codigo>", methods=["GET"])

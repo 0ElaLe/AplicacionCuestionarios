@@ -27,6 +27,18 @@ const router = createRouter({
       name: 'contestar',
       component: () => import('../views/ContestarView.vue'),
     },
+    {
+      path: '/editar/:id',
+      name: 'editar',
+      component: () => import('../views/EditarCuestionarioView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/resultados/:id',
+      name: 'resultados',
+      component: () => import('../views/ResultadosView.vue'),
+      meta: { requiresAuth: true },
+    },
 
     // ── Flujo de respuesta ────────────────────────────────────
     { path: '/cuestionario', name: 'cuestionario', component: () => import('../views/CuestionarioView.vue') },

@@ -17,6 +17,8 @@ import TextoLargoQuestion    from '../components/questions/TextoLargoQuestion.vu
 import OpcionUnicaQuestion   from '../components/questions/OpcionUnicaQuestion.vue'
 import OpcionMultipleQuestion from '../components/questions/OpcionMultipleQuestion.vue'
 import EscalaQuestion        from '../components/questions/EscalaQuestion.vue'
+import SiNoQuestion          from '../components/questions/SiNoQuestion.vue'
+import FechaQuestion         from '../components/questions/FechaQuestion.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -122,9 +124,9 @@ const preguntasFaltantes = computed(() => {
     if (!p.obligatoria) return false
     const r = respuestas[p.id_pregunta]
     if (!r) return true
-    if (p.tipo === 'texto_corto' || p.tipo === 'texto_largo') return !r.respuesta_texto?.trim()
+    if (p.tipo === 'texto_corto' || p.tipo === 'texto_largo' || p.tipo === 'fecha') return !r.respuesta_texto?.trim()
     if (p.tipo === 'escala') return r.respuesta_numero === undefined || r.respuesta_numero === null
-    if (p.tipo === 'opcion_unica' || p.tipo === 'opcion_multiple') return !r.opciones?.length
+    if (p.tipo === 'opcion_unica' || p.tipo === 'opcion_multiple' || p.tipo === 'si_no') return !r.opciones?.length
     return false
   })
 })
@@ -135,9 +137,9 @@ const progresoPct = computed(() => {
   const respondidas = formulario.value.preguntas.filter(p => {
     const r = respuestas[p.id_pregunta]
     if (!r) return false
-    if (p.tipo === 'texto_corto' || p.tipo === 'texto_largo') return !!r.respuesta_texto?.trim()
+    if (p.tipo === 'texto_corto' || p.tipo === 'texto_largo' || p.tipo === 'fecha') return !!r.respuesta_texto?.trim()
     if (p.tipo === 'escala') return r.respuesta_numero !== null && r.respuesta_numero !== undefined
-    if (p.tipo === 'opcion_unica' || p.tipo === 'opcion_multiple') return !!r.opciones?.length
+    if (p.tipo === 'opcion_unica' || p.tipo === 'opcion_multiple' || p.tipo === 'si_no') return !!r.opciones?.length
     return false
   }).length
   return Math.round((respondidas / total) * 100)
@@ -163,13 +165,13 @@ async function enviar() {
         const tipo = preguntaMap[id_pregunta]
         if (!tipo) return null
 
-        if (tipo === 'texto_corto' || tipo === 'texto_largo') {
+        if (tipo === 'texto_corto' || tipo === 'texto_largo' || tipo === 'fecha') {
           return { id_pregunta, respuesta_texto: r.respuesta_texto ?? '' }
         }
         if (tipo === 'escala') {
           return { id_pregunta, respuesta_numero: r.respuesta_numero ?? null }
         }
-        if (tipo === 'opcion_unica' || tipo === 'opcion_multiple') {
+        if (tipo === 'opcion_unica' || tipo === 'opcion_multiple' || tipo === 'si_no') {
           return { id_pregunta, opciones: r.opciones ?? [] }
         }
         return null
@@ -332,6 +334,21 @@ function onRespuestaChange() {
               :opciones="pregunta.opciones"
               :model-value="respuestas[pregunta.id_pregunta]?.respuesta_numero ?? null"
               @update:model-value="v => { respuestas[pregunta.id_pregunta] = { ...respuestas[pregunta.id_pregunta], respuesta_numero: v }; onRespuestaChange() }"
+            />
+          </template>
+          <template v-else-if="pregunta.tipo === 'si_no'">
+            <SiNoQuestion
+              :id-pregunta="pregunta.id_pregunta"
+              :opciones="pregunta.opciones"
+              :model-value="respuestas[pregunta.id_pregunta]?.opciones?.[0] ?? null"
+              @update:model-value="v => { respuestas[pregunta.id_pregunta] = { ...respuestas[pregunta.id_pregunta], opciones: v !== null ? [v] : [] }; onRespuestaChange() }"
+            />
+          </template>
+          <template v-else-if="pregunta.tipo === 'fecha'">
+            <FechaQuestion
+              :id-pregunta="pregunta.id_pregunta"
+              :model-value="respuestas[pregunta.id_pregunta]?.respuesta_texto ?? ''"
+              @update:model-value="v => { respuestas[pregunta.id_pregunta] = { ...respuestas[pregunta.id_pregunta], respuesta_texto: v }; onRespuestaChange() }"
             />
           </template>
         </div>

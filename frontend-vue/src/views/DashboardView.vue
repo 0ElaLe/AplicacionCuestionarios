@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { apiService, type FormularioResumen, type FormularioPublico, type FormularioRespondido } from '../services/api.service'
+// FormularioResumen.estado puede ser 'publicado' | 'archivado'
 
 const router = useRouter()
 const { usuarioActual, logout, cargarPerfil } = useAuth()
@@ -19,6 +20,16 @@ const publicos = ref<FormularioPublico[]>([])
 
 const cargandoLista = ref(false)
 const copiado = ref<string | null>(null)
+const archivando = ref<number | null>(null)
+
+async function toggleArchivar(f: FormularioResumen) {
+  archivando.value = f.id_formulario
+  try {
+    const res = await apiService.archivarFormulario(f.id_formulario)
+    f.estado = res.estado
+  } catch { /* ignorar */ }
+  archivando.value = null
+}
 
 onMounted(async () => {
   await cargarPerfil()
@@ -148,15 +159,25 @@ function copiarCodigo(codigo: string) {
             Aún no has creado ningún cuestionario.
           </div>
           <div v-else class="mis-lista">
-            <div v-for="f in misFormularios" :key="f.id_formulario" class="mis-item">
+            <div v-for="f in misFormularios" :key="f.id_formulario" class="mis-item mis-item--creado">
               <div class="mis-item-info">
-                <p class="mis-item-titulo">{{ f.titulo }}</p>
+                <p class="mis-item-titulo">
+                  {{ f.titulo }}
+                  <span v-if="f.estado === 'archivado'" class="tag-archivado">Archivado</span>
+                </p>
                 <p class="mis-item-fecha">Creado el {{ new Date(f.fecha_creacion).toLocaleDateString('es-MX') }}</p>
               </div>
-              <div class="mis-item-codigo">
+              <div class="mis-item-acciones">
                 <span class="codigo-badge">{{ f.codigo_compartir }}</span>
                 <button class="btn btn--ghost btn--sm" :title="copiado === f.codigo_compartir ? '¡Copiado!' : 'Copiar código'" @click="copiarCodigo(f.codigo_compartir)">
                   {{ copiado === f.codigo_compartir ? '✓' : '📋' }}
+                </button>
+                <button class="btn btn--ghost btn--sm" title="Ver resultados" @click="router.push(`/resultados/${f.id_formulario}`)">📊</button>
+                <button class="btn btn--ghost btn--sm" title="Editar" @click="router.push(`/editar/${f.id_formulario}`)">✏️</button>
+                <button class="btn btn--ghost btn--sm" :title="f.estado === 'archivado' ? 'Publicar' : 'Archivar'"
+                  :disabled="archivando === f.id_formulario"
+                  @click="toggleArchivar(f)">
+                  {{ f.estado === 'archivado' ? '📤' : '📦' }}
                 </button>
               </div>
             </div>
@@ -306,6 +327,12 @@ function copiarCodigo(codigo: string) {
 .mis-item-desc { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 .mis-item-codigo { display: flex; align-items: center; gap: var(--space-2); }
+.mis-item-acciones { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.tag-archivado {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: .05em;
+  background: #fef3c7; color: #92400e;
+  padding: 2px 6px; border-radius: 4px;
+}
 .codigo-badge {
   font-family: monospace;
   font-size: var(--font-size-sm);
